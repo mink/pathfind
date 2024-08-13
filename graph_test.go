@@ -6,6 +6,7 @@ package pathfind
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -25,9 +26,10 @@ func TestGraphNeighbours(t *testing.T) {
 		{"d", nil},
 	}
 	for _, tt := range tests {
-		got := g.Neighbours(tt.node)
+		got := slices.Collect(g.Neighbours(tt.node))
 		if !reflect.DeepEqual(got, tt.want) {
-			t.Errorf("Neighbors of node %q: got %v, want %v", tt.node, got, tt.want)
+			t.Errorf("Neighbors of node %q: got %v, want %v",
+				tt.node, got, tt.want)
 		}
 	}
 }

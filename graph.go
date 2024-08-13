@@ -4,6 +4,11 @@
 
 package pathfind
 
+import (
+	"iter"
+	"slices"
+)
+
 // graph is represented by an adjacency list.
 type graph[Node comparable] map[Node][]Node
 
@@ -15,6 +20,6 @@ func (g graph[Node]) link(a, b Node) graph[Node] {
 
 // Neighbours returns the neighbour nodes of node n in the graph.
 // This method makes graph[Node] implement the astar.Graph[Node] interface.
-func (g graph[Node]) Neighbours(n Node) []Node {
-	return g[n]
+func (g graph[Node]) Neighbours(n Node) iter.Seq[Node] {
+	return slices.Values(g[n])
 }
