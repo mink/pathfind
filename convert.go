@@ -5,27 +5,26 @@
 package pathfind
 
 import (
-	"image"
 	"math"
 
 	"github.com/fzipp/geom"
 )
 
-// ps2vs converts a []image.Point to a []geom.Vec2.
-func ps2vs(ps []image.Point) []geom.Vec2 {
+// ps2vs converts a []Point to a []geom.Vec2.
+func ps2vs(ps []Point) []geom.Vec2 {
 	return convert(ps, p2v)
 }
 
-// p2v converts an image.Point to a geom.Vec2.
-func p2v(p image.Point) geom.Vec2 {
+// p2v converts an Point to a geom.Vec2.
+func p2v(p Point) geom.Vec2 {
 	return geom.Vec2{X: float32(p.X), Y: float32(p.Y)}
 }
 
-// v2p converts a geom.Vec2 to an image.Point. X and Y coordinates are rounded.
-func v2p(v geom.Vec2) image.Point {
-	return image.Point{
-		X: int(math.Round(float64(v.X))),
-		Y: int(math.Round(float64(v.Y))),
+// v2p converts a geom.Vec2 to an Point. X and Y coordinates are rounded.
+func v2p(v geom.Vec2) Point {
+	return Point{
+		X: math.Round(float64(v.X)),
+		Y: math.Round(float64(v.Y)),
 	}
 }
 

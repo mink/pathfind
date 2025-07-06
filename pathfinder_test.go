@@ -5,7 +5,6 @@
 package pathfind_test
 
 import (
-	"image"
 	"reflect"
 	"testing"
 
@@ -19,16 +18,16 @@ import (
 //	     |   +---+   |
 //	     |           |
 //	0,20 +-----------+ 30,20
-var polygonU = [][]image.Point{
+var polygonU = [][]pathfind.Point{
 	{
-		image.Pt(0, 0),
-		image.Pt(10, 0),
-		image.Pt(10, 10),
-		image.Pt(20, 10),
-		image.Pt(20, 0),
-		image.Pt(30, 0),
-		image.Pt(30, 20),
-		image.Pt(0, 20),
+		pathfind.Pt(0, 0),
+		pathfind.Pt(10, 0),
+		pathfind.Pt(10, 10),
+		pathfind.Pt(20, 10),
+		pathfind.Pt(20, 0),
+		pathfind.Pt(30, 0),
+		pathfind.Pt(30, 20),
+		pathfind.Pt(0, 20),
 	},
 }
 
@@ -41,30 +40,30 @@ var polygonU = [][]image.Point{
 //	     |    \ /    |
 //	     |     +     |
 //	0,40 +-----------+ 40,40
-var polygonO = [][]image.Point{
+var polygonO = [][]pathfind.Point{
 	{
 		// Outer rectangle
-		image.Pt(0, 0),
-		image.Pt(40, 0),
-		image.Pt(40, 40),
-		image.Pt(0, 40),
+		pathfind.Pt(0, 0),
+		pathfind.Pt(40, 0),
+		pathfind.Pt(40, 40),
+		pathfind.Pt(0, 40),
 	},
 	{
 		// Inner diamond
-		image.Pt(20, 10),
-		image.Pt(30, 20),
-		image.Pt(20, 30),
-		image.Pt(10, 20),
+		pathfind.Pt(20, 10),
+		pathfind.Pt(30, 20),
+		pathfind.Pt(20, 30),
+		pathfind.Pt(10, 20),
 	},
 }
 
 func TestPathfinderPath(t *testing.T) {
 	tests := []struct {
 		name     string
-		polygons [][]image.Point
-		start    image.Point
-		dest     image.Point
-		want     []image.Point
+		polygons [][]pathfind.Point
+		start    pathfind.Point
+		dest     pathfind.Point
+		want     []pathfind.Point
 	}{
 		{
 			// +---+   +---+
@@ -74,11 +73,11 @@ func TestPathfinderPath(t *testing.T) {
 			// +-----------+
 			name:     "Direct connection",
 			polygons: polygonU,
-			start:    image.Pt(5, 5),
-			dest:     image.Pt(5, 15),
-			want: []image.Point{
-				image.Pt(5, 5),
-				image.Pt(5, 15),
+			start:    pathfind.Pt(5, 5),
+			dest:     pathfind.Pt(5, 15),
+			want: []pathfind.Point{
+				pathfind.Pt(5, 5),
+				pathfind.Pt(5, 15),
 			},
 		},
 		{
@@ -89,12 +88,12 @@ func TestPathfinderPath(t *testing.T) {
 			// +-----------+
 			name:     "One corner",
 			polygons: polygonU,
-			start:    image.Pt(5, 5),
-			dest:     image.Pt(25, 15),
-			want: []image.Point{
-				image.Pt(5, 5),
-				image.Pt(10, 10),
-				image.Pt(25, 15),
+			start:    pathfind.Pt(5, 5),
+			dest:     pathfind.Pt(25, 15),
+			want: []pathfind.Point{
+				pathfind.Pt(5, 5),
+				pathfind.Pt(10, 10),
+				pathfind.Pt(25, 15),
 			},
 		},
 		{
@@ -105,13 +104,13 @@ func TestPathfinderPath(t *testing.T) {
 			// +-----------+
 			name:     "Two corners",
 			polygons: polygonU,
-			start:    image.Pt(5, 5),
-			dest:     image.Pt(25, 5),
-			want: []image.Point{
-				image.Pt(5, 5),
-				image.Pt(10, 10),
-				image.Pt(20, 10),
-				image.Pt(25, 5),
+			start:    pathfind.Pt(5, 5),
+			dest:     pathfind.Pt(25, 5),
+			want: []pathfind.Point{
+				pathfind.Pt(5, 5),
+				pathfind.Pt(10, 10),
+				pathfind.Pt(20, 10),
+				pathfind.Pt(25, 5),
 			},
 		},
 		{
@@ -122,11 +121,11 @@ func TestPathfinderPath(t *testing.T) {
 			// +-----------+
 			name:     "No path through wall: dest clamped to polygons",
 			polygons: polygonU,
-			start:    image.Pt(5, 5),
-			dest:     image.Pt(15, 5),
-			want: []image.Point{
-				image.Pt(5, 5),
-				image.Pt(10, 5),
+			start:    pathfind.Pt(5, 5),
+			dest:     pathfind.Pt(15, 5),
+			want: []pathfind.Point{
+				pathfind.Pt(5, 5),
+				pathfind.Pt(10, 5),
 			},
 		},
 		{
@@ -137,8 +136,8 @@ func TestPathfinderPath(t *testing.T) {
 			// +-----------+
 			name:     "No path outside polygon",
 			polygons: polygonU,
-			start:    image.Pt(15, 0),
-			dest:     image.Pt(15, 5),
+			start:    pathfind.Pt(15, 0),
+			dest:     pathfind.Pt(15, 5),
 			want:     nil,
 		},
 		{
@@ -151,13 +150,13 @@ func TestPathfinderPath(t *testing.T) {
 			// +-----------+
 			name:     "Path around inner polygon",
 			polygons: polygonO,
-			start:    image.Pt(15, 10),
-			dest:     image.Pt(30, 30),
-			want: []image.Point{
-				image.Pt(15, 10),
-				image.Pt(20, 10),
-				image.Pt(30, 20),
-				image.Pt(30, 30),
+			start:    pathfind.Pt(15, 10),
+			dest:     pathfind.Pt(30, 30),
+			want: []pathfind.Point{
+				pathfind.Pt(15, 10),
+				pathfind.Pt(20, 10),
+				pathfind.Pt(30, 20),
+				pathfind.Pt(30, 30),
 			},
 		},
 		{
@@ -171,53 +170,53 @@ func TestPathfinderPath(t *testing.T) {
 			//           \ |
 			//             +
 			name: "No path out of thunderbolt shape: dest clamped to polygons",
-			polygons: [][]image.Point{
+			polygons: [][]pathfind.Point{
 				{
-					image.Pt(0, 0),
-					image.Pt(100, 100),
-					image.Pt(200, 100),
-					image.Pt(200, 300),
-					image.Pt(100, 200),
-					image.Pt(0, 200),
+					pathfind.Pt(0, 0),
+					pathfind.Pt(100, 100),
+					pathfind.Pt(200, 100),
+					pathfind.Pt(200, 300),
+					pathfind.Pt(100, 200),
+					pathfind.Pt(0, 200),
 				},
 			},
-			start: image.Pt(30, 70),
-			dest:  image.Pt(100, 70),
-			want: []image.Point{
-				image.Pt(30, 70),
-				image.Pt(85, 85),
+			start: pathfind.Pt(30, 70),
+			dest:  pathfind.Pt(100, 70),
+			want: []pathfind.Point{
+				pathfind.Pt(30, 70),
+				pathfind.Pt(85, 85),
 			},
 		},
 		{
 			name: "ensure clamped dest inside 1",
-			polygons: [][]image.Point{
+			polygons: [][]pathfind.Point{
 				{
-					image.Pt(70, 55),
-					image.Pt(250, 54),
-					image.Pt(300, 100),
+					pathfind.Pt(70, 55),
+					pathfind.Pt(250, 54),
+					pathfind.Pt(300, 100),
 				},
 			},
-			start: image.Pt(180, 60),
-			dest:  image.Pt(181, 54),
-			want: []image.Point{
-				image.Pt(180, 60),
-				image.Pt(180, 55),
+			start: pathfind.Pt(180, 60),
+			dest:  pathfind.Pt(181, 54),
+			want: []pathfind.Point{
+				pathfind.Pt(180, 60),
+				pathfind.Pt(180, 55),
 			},
 		},
 		{
 			name: "ensure clamped dest inside 2",
-			polygons: [][]image.Point{
+			polygons: [][]pathfind.Point{
 				{
-					image.Pt(73, 55),
-					image.Pt(100, 100),
-					image.Pt(76, 168),
+					pathfind.Pt(73, 55),
+					pathfind.Pt(100, 100),
+					pathfind.Pt(76, 168),
 				},
 			},
-			start: image.Pt(90, 100),
-			dest:  image.Pt(74, 98),
-			want: []image.Point{
-				image.Pt(90, 100),
-				image.Pt(75, 97),
+			start: pathfind.Pt(90, 100),
+			dest:  pathfind.Pt(74, 98),
+			want: []pathfind.Point{
+				pathfind.Pt(90, 100),
+				pathfind.Pt(75, 97),
 			},
 		},
 	}
@@ -240,10 +239,10 @@ want: %v`,
 func TestPathfinderVisibilityGraph(t *testing.T) {
 	tests := []struct {
 		name     string
-		polygons [][]image.Point
-		start    image.Point
-		dest     image.Point
-		want     map[image.Point][]image.Point
+		polygons [][]pathfind.Point
+		start    pathfind.Point
+		dest     pathfind.Point
+		want     map[pathfind.Point][]pathfind.Point
 	}{
 		{
 			// >---+   +---+
@@ -253,13 +252,13 @@ func TestPathfinderVisibilityGraph(t *testing.T) {
 			// +-----------+
 			name:     "Two corners",
 			polygons: polygonU,
-			start:    image.Pt(5, 5),
-			dest:     image.Pt(25, 5),
-			want: map[image.Point][]image.Point{
-				image.Pt(5, 5):   {image.Pt(10, 10)},
-				image.Pt(10, 10): {image.Pt(20, 10), image.Pt(5, 5)},
-				image.Pt(20, 10): {image.Pt(10, 10), image.Pt(25, 5)},
-				image.Pt(25, 5):  {image.Pt(20, 10)},
+			start:    pathfind.Pt(5, 5),
+			dest:     pathfind.Pt(25, 5),
+			want: map[pathfind.Point][]pathfind.Point{
+				pathfind.Pt(5, 5):   {pathfind.Pt(10, 10)},
+				pathfind.Pt(10, 10): {pathfind.Pt(20, 10), pathfind.Pt(5, 5)},
+				pathfind.Pt(20, 10): {pathfind.Pt(10, 10), pathfind.Pt(25, 5)},
+				pathfind.Pt(25, 5):  {pathfind.Pt(20, 10)},
 			},
 		},
 	}

@@ -7,7 +7,6 @@
 package pathfind
 
 import (
-	"image"
 	"math"
 
 	"github.com/fzipp/astar"
@@ -19,17 +18,17 @@ import (
 // NewPathfinder. Its Path method finds the shortest path between two points
 // in this polygon set.
 type Pathfinder struct {
-	polygons        [][]image.Point
+	polygons        [][]Point
 	polygonSet      poly.PolygonSet
-	concaveVertices []image.Point
-	visibilityGraph graph[image.Point]
+	concaveVertices []Point
+	visibilityGraph graph[Point]
 }
 
 // NewPathfinder creates a Pathfinder instance and initializes it with a set of
 // polygons.
 //
-// A polygon is represented by a slice of points, i.e. []image.Point, describing
-// the vertices of the polygon. Thus [][]image.Point is a slice of polygons,
+// A polygon is represented by a slice of points, i.e. []Point, describing
+// the vertices of the polygon. Thus [][]Point is a slice of polygons,
 // i.e. the set of polygons.
 //
 // Each polygon in the polygon set designates either an area that is accessible
@@ -38,8 +37,8 @@ type Pathfinder struct {
 //   - Polygons at the first level are area polygons.
 //   - Polygons contained inside an area polygon are holes.
 //   - Polygons contained inside a hole are area polygons again.
-func NewPathfinder(polygons [][]image.Point) *Pathfinder {
-	polygonSet := convert(polygons, func(ps []image.Point) poly.Polygon {
+func NewPathfinder(polygons [][]Point) *Pathfinder {
+	polygonSet := convert(polygons, func(ps []Point) poly.Polygon {
 		return ps2vs(ps)
 	})
 	return &Pathfinder{
@@ -51,7 +50,7 @@ func NewPathfinder(polygons [][]image.Point) *Pathfinder {
 
 // VisibilityGraph returns the calculated visibility graph from the last Path
 // call. It is only available after Path was called, otherwise nil.
-func (p *Pathfinder) VisibilityGraph() map[image.Point][]image.Point {
+func (p *Pathfinder) VisibilityGraph() map[Point][]Point {
 	return p.visibilityGraph
 }
 
@@ -61,17 +60,17 @@ func (p *Pathfinder) VisibilityGraph() map[image.Point][]image.Point {
 // polygon edge.
 // The function returns nil if no path exists because start is outside
 // the polygon set.
-func (p *Pathfinder) Path(start, dest image.Point) []image.Point {
+func (p *Pathfinder) Path(start, dest Point) []Point {
 	d := p2v(dest)
 	if !p.polygonSet.Contains(d) {
 		dest = ensureInside(p.polygonSet, v2p(p.polygonSet.ClosestPt(d)))
 	}
 	graphVertices := append(p.concaveVertices, start, dest)
 	p.visibilityGraph = visibilityGraph(p.polygonSet, graphVertices)
-	return astar.FindPath[image.Point](p.visibilityGraph, start, dest, nodeDist, nodeDist)
+	return astar.FindPath[Point](p.visibilityGraph, start, dest, nodeDist, nodeDist)
 }
 
-func ensureInside(ps poly.PolygonSet, pt image.Point) image.Point {
+func ensureInside(ps poly.PolygonSet, pt Point) Point {
 	if ps.Contains(p2v(pt)) {
 		return pt
 	}
@@ -81,7 +80,7 @@ adjustment:
 			if dx == 0 && dy == 0 {
 				continue
 			}
-			npt := pt.Add(image.Point{X: dx, Y: dy})
+			npt := pt.Add(Point{X: float64(dx), Y: float64(dy)})
 			if ps.Contains(p2v(npt)) {
 				pt = npt
 				break adjustment
@@ -91,8 +90,8 @@ adjustment:
 	return pt
 }
 
-func concaveVertices(ps poly.PolygonSet) []image.Point {
-	var vs []image.Point
+func concaveVertices(ps poly.PolygonSet) []Point {
+	var vs []Point
 	for i, p := range ps {
 		t := concave
 		if isHole(ps, i) {
@@ -120,8 +119,8 @@ const (
 	convex
 )
 
-func verticesOfType(p poly.Polygon, t vertexType) []image.Point {
-	var vs []image.Point
+func verticesOfType(p poly.Polygon, t vertexType) []Point {
+	var vs []Point
 	for i, v := range p {
 		isConcave := p.IsConcaveAt(i)
 		if (t == concave && isConcave) || (t == convex && !isConcave) {
@@ -131,8 +130,8 @@ func verticesOfType(p poly.Polygon, t vertexType) []image.Point {
 	return vs
 }
 
-func visibilityGraph(ps poly.PolygonSet, points []image.Point) graph[image.Point] {
-	vis := make(graph[image.Point])
+func visibilityGraph(ps poly.PolygonSet, points []Point) graph[Point] {
+	vis := make(graph[Point])
 	for i, a := range points {
 		for j, b := range points {
 			if i == j {
@@ -158,7 +157,7 @@ func inLineOfSight(ps poly.PolygonSet, start, end geom.Vec2) bool {
 
 // nodeDist is the cost function for the A* algorithm. The visibility graph has
 // 2d points as nodes, so we calculate the Euclidean distance.
-func nodeDist(a, b image.Point) float64 {
+func nodeDist(a, b Point) float64 {
 	c := a.Sub(b)
-	return math.Sqrt(float64(c.X*c.X + c.Y*c.Y))
+	return math.Sqrt(c.X*c.X + c.Y*c.Y)
 }

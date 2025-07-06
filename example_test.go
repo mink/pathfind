@@ -6,7 +6,6 @@ package pathfind_test
 
 import (
 	"fmt"
-	"image"
 
 	"github.com/fzipp/pathfind"
 )
@@ -19,28 +18,28 @@ func ExamplePathfinder_Path() {
 	// (0,20) +-------------------+ (50,20)
 	//
 	// s = start, d = destination
-	polygons := [][]image.Point{
+	polygons := [][]pathfind.Point{
 		// Outer shape
 		{
-			image.Pt(0, 0),
-			image.Pt(10, 0),
-			image.Pt(10, 10),
-			image.Pt(20, 10),
-			image.Pt(20, 0),
-			image.Pt(50, 0),
-			image.Pt(50, 20),
-			image.Pt(0, 20),
+			pathfind.Pt(0, 0),
+			pathfind.Pt(10, 0),
+			pathfind.Pt(10, 10),
+			pathfind.Pt(20, 10),
+			pathfind.Pt(20, 0),
+			pathfind.Pt(50, 0),
+			pathfind.Pt(50, 20),
+			pathfind.Pt(0, 20),
 		},
 		// Inner rectangle ("hole")
 		{
-			image.Pt(30, 5),
-			image.Pt(40, 5),
-			image.Pt(40, 15),
-			image.Pt(30, 15),
+			pathfind.Pt(30, 5),
+			pathfind.Pt(40, 5),
+			pathfind.Pt(40, 15),
+			pathfind.Pt(30, 15),
 		},
 	}
-	start := image.Pt(5, 5)
-	destination := image.Pt(45, 10)
+	start := pathfind.Pt(5, 5)
+	destination := pathfind.Pt(45, 10)
 
 	pathfinder := pathfind.NewPathfinder(polygons)
 	path := pathfinder.Path(start, destination)
