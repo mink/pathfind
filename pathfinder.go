@@ -14,6 +14,8 @@ import (
 	"github.com/fzipp/pathfind/internal/poly"
 )
 
+const margin = 0.001
+
 // A Pathfinder is created and initialized with a set of polygons via
 // NewPathfinder. Its Path method finds the shortest path between two points
 // in this polygon set.
@@ -67,7 +69,11 @@ func (p *Pathfinder) Path(start, dest Point) []Point {
 	}
 	graphVertices := append(p.concaveVertices, start, dest)
 	p.visibilityGraph = visibilityGraph(p.polygonSet, graphVertices)
-	return astar.FindPath[Point](p.visibilityGraph, start, dest, nodeDist, nodeDist)
+	path := astar.FindPath[Point](p.visibilityGraph, start, dest, nodeDist, nodeDist)
+	for i := 1; i < len(path)-1; i++ {
+		path[i] = offsetFromBoundary(p.polygonSet, path[i])
+	}
+	return path
 }
 
 func ensureInside(ps poly.PolygonSet, pt Point) Point {
@@ -80,7 +86,7 @@ adjustment:
 			if dx == 0 && dy == 0 {
 				continue
 			}
-			npt := pt.Add(Point{X: float64(dx), Y: float64(dy)})
+			npt := pt.Add(Point{X: float64(dx) * margin, Y: float64(dy) * margin})
 			if ps.Contains(p2v(npt)) {
 				pt = npt
 				break adjustment
@@ -160,4 +166,28 @@ func inLineOfSight(ps poly.PolygonSet, start, end geom.Vec2) bool {
 func nodeDist(a, b Point) float64 {
 	c := a.Sub(b)
 	return math.Sqrt(c.X*c.X + c.Y*c.Y)
+}
+
+func offsetFromBoundary(ps poly.PolygonSet, pt Point) Point {
+	v := p2v(pt)
+	for _, p := range ps {
+		for i, pv := range p {
+			if pv.NearEq(v) {
+				prev := p[p.WrapIndex(i-1)]
+				next := p[p.WrapIndex(i+1)]
+				e1 := pv.Sub(prev).Norm()
+				e2 := next.Sub(pv).Norm()
+				bis := e1.Add(e2)
+				if bis.Len() == 0 {
+					bis = geom.Vec2{X: -e1.Y, Y: e1.X}
+				}
+				bis = bis.Norm().Mul(float32(margin))
+				moved := pv.Add(bis)
+				if ps.Contains(moved) {
+					return v2p(moved)
+				}
+			}
+		}
+	}
+	return pt
 }
