@@ -63,6 +63,9 @@ func (p *Pathfinder) VisibilityGraph() map[Point][]Point {
 // The function returns nil if no path exists because start is outside
 // the polygon set.
 func (p *Pathfinder) Path(start, dest Point) []Point {
+	if containmentLevel(p.polygonSet, start) != containmentLevel(p.polygonSet, dest) {
+		return nil
+	}
 	d := p2v(dest)
 	if !p.polygonSet.Contains(d) {
 		dest = ensureInside(p.polygonSet, v2p(p.polygonSet.ClosestPt(d)))
@@ -116,6 +119,17 @@ func isHole(ps poly.PolygonSet, i int) bool {
 		}
 	}
 	return hole
+}
+
+func containmentLevel(ps poly.PolygonSet, pt Point) int {
+	level := 0
+	v := p2v(pt)
+	for _, p := range ps {
+		if p.Contains(v, true) {
+			level++
+		}
+	}
+	return level
 }
 
 type vertexType int
