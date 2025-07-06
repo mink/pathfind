@@ -184,21 +184,38 @@ func nodeDist(a, b Point) float64 {
 
 func offsetFromBoundary(ps poly.PolygonSet, pt Point) Point {
 	v := p2v(pt)
-	for _, p := range ps {
+	for pi, p := range ps {
+		orient := p.Orientation()
+		hole := isHole(ps, pi)
 		for i, pv := range p {
 			if pv.NearEq(v) {
 				prev := p[p.WrapIndex(i-1)]
 				next := p[p.WrapIndex(i+1)]
 				e1 := pv.Sub(prev).Norm()
 				e2 := next.Sub(pv).Norm()
-				bis := e1.Add(e2)
+				var n1, n2 geom.Vec2
+				if orient > 0 { // ccw
+					n1 = geom.Vec2{X: e1.Y, Y: -e1.X}
+					n2 = geom.Vec2{X: e2.Y, Y: -e2.X}
+				} else { // cw
+					n1 = geom.Vec2{X: -e1.Y, Y: e1.X}
+					n2 = geom.Vec2{X: -e2.Y, Y: e2.X}
+				}
+
+				bis := n1.Add(n2)
 				if bis.Len() == 0 {
-					bis = geom.Vec2{X: -e1.Y, Y: e1.X}
+					bis = nil
 				}
 				bis = bis.Norm().Mul(float32(margin))
-				moved := pv.Add(bis)
-				if ps.Contains(moved) {
-					return v2p(moved)
+				if hole {
+					if ps.Contains(moved) {
+						return v2p(moved)
+					}
+				} else {
+					movedIn := pv.Sub(bis)
+					if ps.Contains(movedIn) {
+						return v2p(movedIn)
+					}
 				}
 			}
 		}

@@ -135,3 +135,15 @@ func (p Polygon) WrapIndex(i int) int {
 	n := len(p)
 	return ((i % n) + n) % n
 }
+
+func (p Polygon) Orientation() int {
+	var sum float32
+	for i := range p {
+		j := (i + 1) % len(p)
+		sum += p[i].X*p[j].Y - p[j].X*p[i].Y
+	}
+	if sum >= 0 {
+		return +1
+	}
+	return -1
+}
