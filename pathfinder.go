@@ -14,7 +14,7 @@ import (
 	"github.com/fzipp/pathfind/internal/poly"
 )
 
-const margin = 0.001
+const margin = 0.002
 
 // A Pathfinder is created and initialized with a set of polygons via
 // NewPathfinder. Its Path method finds the shortest path between two points
@@ -204,10 +204,11 @@ func offsetFromBoundary(ps poly.PolygonSet, pt Point) Point {
 
 				bis := n1.Add(n2)
 				if bis.Len() == 0 {
-					bis = nil
+					bis = n1
 				}
 				bis = bis.Norm().Mul(float32(margin))
 				if hole {
+					moved := pv.Add(bis)
 					if ps.Contains(moved) {
 						return v2p(moved)
 					}
