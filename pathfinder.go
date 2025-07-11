@@ -23,6 +23,7 @@ type Pathfinder struct {
 	polygons        [][]Point
 	polygonSet      poly.PolygonSet
 	concaveVertices []Point
+	cachedGraph     graph[Point]
 	visibilityGraph graph[Point]
 }
 
@@ -43,10 +44,12 @@ func NewPathfinder(polygons [][]Point) *Pathfinder {
 	polygonSet := convert(polygons, func(ps []Point) poly.Polygon {
 		return ps2vs(ps)
 	})
+	concave := concaveVertices(polygonSet)
 	return &Pathfinder{
 		polygons:        polygons,
 		polygonSet:      polygonSet,
-		concaveVertices: concaveVertices(polygonSet),
+		concaveVertices: concave,
+		cachedGraph:     visibilityGraph(polygonSet, concave),
 	}
 }
 
@@ -70,8 +73,7 @@ func (p *Pathfinder) Path(start, dest Point) []Point {
 	if !p.polygonSet.Contains(d) {
 		dest = ensureInside(p.polygonSet, v2p(p.polygonSet.ClosestPt(d)))
 	}
-	graphVertices := append(p.concaveVertices, start, dest)
-	p.visibilityGraph = visibilityGraph(p.polygonSet, graphVertices)
+	p.visibilityGraph = p.prepareVisibilityGraph(start, dest)
 	path := astar.FindPath[Point](p.visibilityGraph, start, dest, nodeDist, nodeDist)
 	for i := 1; i < len(path)-1; i++ {
 		path[i] = offsetFromBoundary(p.polygonSet, path[i])
@@ -222,4 +224,48 @@ func offsetFromBoundary(ps poly.PolygonSet, pt Point) Point {
 		}
 	}
 	return pt
+}
+
+func (p *Pathfinder) prepareVisibilityGraph(start, dest Point) graph[Point] {
+	vis := copyGraph(p.cachedGraph)
+	vis[start] = vis[start]
+	vis[dest] = vis[dest]
+
+	points := append([]Point(nil), p.concaveVertices...)
+	points = append(points, dest)
+	for _, b := range points {
+		if b != start && inLineOfSight(p.polygonSet, p2v(start), p2v(b)) {
+			vis.link(start, b)
+		}
+		if b != start && inLineOfSight(p.polygonSet, p2v(b), p2v(start)) {
+			vis.link(b, start)
+		}
+	}
+
+	points = append(p.concaveVertices, start)
+	for _, b := range points {
+		if b != dest && inLineOfSight(p.polygonSet, p2v(dest), p2v(b)) {
+			vis.link(dest, b)
+		}
+		if b != dest && inLineOfSight(p.polygonSet, p2v(b), p2v(dest)) {
+			vis.link(b, dest)
+		}
+	}
+
+	if inLineOfSight(p.polygonSet, p2v(start), p2v(dest)) {
+		vis.link(start, dest)
+		vis.link(dest, start)
+	}
+
+	return vis
+}
+
+func copyGraph(src graph[Point]) graph[Point] {
+	dst := make(graph[Point], len(src))
+	for n, adj := range src {
+		if len(adj) > 0 {
+			dst[n] = append([]Point(nil), adj...)
+		}
+	}
+	return dst
 }
