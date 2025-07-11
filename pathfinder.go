@@ -24,7 +24,6 @@ type Pathfinder struct {
 	polygonSet      poly.PolygonSet
 	concaveVertices []Point
 	cachedGraph     graph[Point]
-	visibilityGraph graph[Point]
 }
 
 // NewPathfinder creates a Pathfinder instance and initializes it with a set of
@@ -53,12 +52,6 @@ func NewPathfinder(polygons [][]Point) *Pathfinder {
 	}
 }
 
-// VisibilityGraph returns the calculated visibility graph from the last Path
-// call. It is only available after Path was called, otherwise nil.
-func (p *Pathfinder) VisibilityGraph() map[Point][]Point {
-	return p.visibilityGraph
-}
-
 // Path finds the shortest path from start to dest within the bounds of the
 // polygons the Pathfinder was initialized with.
 // If dest is outside the polygon set it will be clamped to the nearest
@@ -73,8 +66,8 @@ func (p *Pathfinder) Path(start, dest Point) []Point {
 	if !p.polygonSet.Contains(d) {
 		dest = ensureInside(p.polygonSet, v2p(p.polygonSet.ClosestPt(d)))
 	}
-	p.visibilityGraph = p.prepareVisibilityGraph(start, dest)
-	path := astar.FindPath[Point](p.visibilityGraph, start, dest, nodeDist, nodeDist)
+	visibilityGraph := p.prepareVisibilityGraph(start, dest)
+	path := astar.FindPath[Point](visibilityGraph, start, dest, nodeDist, nodeDist)
 	for i := 1; i < len(path)-1; i++ {
 		path[i] = offsetFromBoundary(p.polygonSet, path[i])
 	}
