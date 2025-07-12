@@ -66,6 +66,9 @@ func (p *Pathfinder) Path(start, dest Point) []Point {
 	if !p.polygonSet.Contains(d) {
 		dest = ensureInside(p.polygonSet, v2p(p.polygonSet.ClosestPt(d)))
 	}
+	if inLineOfSight(p.polygonSet, p2v(start), p2v(dest)) {
+		return []Point{start, dest}
+	}
 	visibilityGraph := p.prepareVisibilityGraph(start, dest)
 	path := astar.FindPath[Point](visibilityGraph, start, dest, nodeDist, nodeDist)
 	for i := 1; i < len(path)-1; i++ {
