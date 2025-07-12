@@ -24,6 +24,7 @@ type Pathfinder struct {
 	polygonSet      poly.PolygonSet
 	concaveVertices []Point
 	cachedGraph     graph[Point]
+	index           *quadTree
 }
 
 // NewPathfinder creates a Pathfinder instance and initializes it with a set of
@@ -44,11 +45,17 @@ func NewPathfinder(polygons [][]Point) *Pathfinder {
 		return ps2vs(ps)
 	})
 	concave := concaveVertices(polygonSet)
+	box := boundingRect(polygons)
+	idx := newQuadTree(box, 8)
+	for _, pt := range concave {
+		idx.insert(pt)
+	}
 	return &Pathfinder{
 		polygons:        polygons,
 		polygonSet:      polygonSet,
 		concaveVertices: concave,
 		cachedGraph:     visibilityGraph(polygonSet, concave),
+		index:           idx,
 	}
 }
 
@@ -223,11 +230,19 @@ func offsetFromBoundary(ps poly.PolygonSet, pt Point) Point {
 }
 
 func (p *Pathfinder) prepareVisibilityGraph(start, dest Point) graph[Point] {
-	vis := copyGraph(p.cachedGraph)
+	radius := nodeDist(start, dest)
+	r := queryRect(start, dest, radius)
+	relevant := p.index.rangeSearch(r)
+	set := make(map[Point]bool, len(relevant))
+	for _, pt := range relevant {
+		set[pt] = true
+	}
+
+	vis := copyGraphSubset(p.cachedGraph, set)
 	vis[start] = vis[start]
 	vis[dest] = vis[dest]
 
-	points := append([]Point(nil), p.concaveVertices...)
+	points := append([]Point(nil), relevant...)
 	points = append(points, dest)
 	for _, b := range points {
 		if b != start && inLineOfSight(p.polygonSet, p2v(start), p2v(b)) {
@@ -238,7 +253,7 @@ func (p *Pathfinder) prepareVisibilityGraph(start, dest Point) graph[Point] {
 		}
 	}
 
-	points = append(p.concaveVertices, start)
+	points = append(relevant, start)
 	for _, b := range points {
 		if b != dest && inLineOfSight(p.polygonSet, p2v(dest), p2v(b)) {
 			vis.link(dest, b)
@@ -261,6 +276,18 @@ func copyGraph(src graph[Point]) graph[Point] {
 	for n, adj := range src {
 		if len(adj) > 0 {
 			dst[n] = append([]Point(nil), adj...)
+		}
+	}
+	return dst
+}
+
+func copyGraphSubset(src graph[Point], nodes map[Point]bool) graph[Point] {
+	dst := make(graph[Point])
+	for n := range nodes {
+		for _, adj := range src[n] {
+			if nodes[adj] {
+				dst.link(n, adj)
+			}
 		}
 	}
 	return dst
