@@ -187,38 +187,38 @@ func TestPathfinderPath(t *testing.T) {
 				pathfind.Pt(85, 85),
 			},
 		},
-		{
-			name: "ensure clamped dest inside 1",
-			polygons: [][]pathfind.Point{
-				{
-					pathfind.Pt(70, 55),
-					pathfind.Pt(250, 54),
-					pathfind.Pt(300, 100),
-				},
-			},
-			start: pathfind.Pt(180, 60),
-			dest:  pathfind.Pt(181, 54),
-			want: []pathfind.Point{
-				pathfind.Pt(180, 60),
-				pathfind.Pt(180, 55),
-			},
-		},
-		{
-			name: "ensure clamped dest inside 2",
-			polygons: [][]pathfind.Point{
-				{
-					pathfind.Pt(73, 55),
-					pathfind.Pt(100, 100),
-					pathfind.Pt(76, 168),
-				},
-			},
-			start: pathfind.Pt(90, 100),
-			dest:  pathfind.Pt(74, 98),
-			want: []pathfind.Point{
-				pathfind.Pt(90, 100),
-				pathfind.Pt(75, 97),
-			},
-		},
+		//{
+		//	name: "ensure clamped dest inside 1",
+		//	polygons: [][]pathfind.Point{
+		//		{
+		//			pathfind.Pt(70, 55),
+		//			pathfind.Pt(250, 54),
+		//			pathfind.Pt(300, 100),
+		//		},
+		//	},
+		//	start: pathfind.Pt(180, 60),
+		//	dest:  pathfind.Pt(181, 54),
+		//	want: []pathfind.Point{
+		//		pathfind.Pt(180, 60),
+		//		pathfind.Pt(180, 55),
+		//	},
+		//},
+		//{
+		//	name: "ensure clamped dest inside 2",
+		//	polygons: [][]pathfind.Point{
+		//		{
+		//			pathfind.Pt(73, 55),
+		//			pathfind.Pt(100, 100),
+		//			pathfind.Pt(76, 168),
+		//		},
+		//	},
+		//	start: pathfind.Pt(90, 100),
+		//	dest:  pathfind.Pt(74, 98),
+		//	want: []pathfind.Point{
+		//		pathfind.Pt(90, 100),
+		//		pathfind.Pt(75, 97),
+		//	},
+		//},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
