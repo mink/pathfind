@@ -188,7 +188,19 @@ func inLineOfSight(ps poly.PolygonSet, start, end geom.Vec2) bool {
 			return false
 		}
 	}
-	return ps.Contains(lineOfSight.Middle())
+
+	// ensure the whole line segment lies within the accessible area.
+	// checking only the middle point may miss holes close to the
+	// start or end position, so we check multiple points
+	const checks = 3
+	for i := 1; i <= checks; i++ {
+		t := float32(i) / float32(checks+1)
+		pt := start.Lerp(end, t)
+		if !ps.Contains(pt) {
+			return false
+		}
+	}
+	return true
 }
 
 // nodeDist is the cost function for the A* algorithm. The visibility graph has
