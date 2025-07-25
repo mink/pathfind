@@ -5,8 +5,6 @@
 package pathfind
 
 import (
-	"math"
-
 	"github.com/fzipp/geom"
 )
 
@@ -23,8 +21,8 @@ func p2v(p Point) geom.Vec2 {
 // v2p converts a geom.Vec2 to an Point. X and Y coordinates are rounded.
 func v2p(v geom.Vec2) Point {
 	return Point{
-		X: math.Round(float64(v.X)),
-		Y: math.Round(float64(v.Y)),
+		X: float64(v.X),
+		Y: float64(v.Y),
 	}
 }
 
