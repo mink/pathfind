@@ -8,11 +8,8 @@ package pathfind
 
 import (
 	"math"
-	"runtime"
-	"sync"
 
 	"github.com/fzipp/astar"
-	"github.com/fzipp/geom"
 	"github.com/fzipp/pathfind/internal/poly"
 )
 
@@ -20,236 +17,108 @@ import (
 // NewPathfinder. Its Path method finds the shortest path between two points
 // in this polygon set.
 type Pathfinder struct {
-	polygons        [][]Point
-	polygonSet      poly.PolygonSet
-	concaveVertices []Point
-	cachedGraph     graph[Point]
-	visibilityGraph graph[Point]
+	polygons []poly.Polygon
+	graph    graph[int]
+	portals  map[[2]int]Point
+	centers  []Point
 }
 
-// NewPathfinder creates a Pathfinder instance and initializes it with a set of
-// polygons.
-//
-// A polygon is represented by a slice of points, i.e. []Point, describing
-// the vertices of the polygon. Thus [][]Point is a slice of polygons,
-// i.e. the set of polygons.
-//
-// Each polygon in the polygon set designates either an area that is accessible
-// for path finding or a hole inside such an area, i.e. an obstacle. Nested
-// polygons alternate between accessible area and inaccessible hole:
-//   - Polygons at the first level are area polygons.
-//   - Polygons contained inside an area polygon are holes.
-//   - Polygons contained inside a hole are area polygons again.
+// NewPathfinder creates a Pathfinder initialized with a navmesh.
+// The polygons slice contains convex polygons that make up the navmesh.
 func NewPathfinder(polygons [][]Point) *Pathfinder {
-	polygonSet := convert(polygons, func(ps []Point) poly.Polygon {
-		return ps2vs(ps)
-	})
-	concave := concaveVertices(polygonSet)
-	return &Pathfinder{
-		polygons:        polygons,
-		polygonSet:      polygonSet,
-		concaveVertices: concave,
-		cachedGraph:     visibilityGraph(polygonSet, concave),
+	ps := make([]poly.Polygon, len(polygons))
+	centers := make([]Point, len(polygons))
+	for i, p := range polygons {
+		ps[i] = ps2vs(p)
+		centers[i] = centroid(ps[i])
 	}
+	g, portals := navGraph(polygons)
+	return &Pathfinder{polygons: ps, graph: g, portals: portals, centers: centers}
 }
 
-// VisibilityGraph returns the calculated visibility graph from the last Path
-// call. It is only available after Path was called, otherwise nil.
-func (p *Pathfinder) VisibilityGraph() map[Point][]Point {
-	return p.visibilityGraph
-}
-
-// Path finds the shortest path from start to dest within the bounds of the
-// polygons the Pathfinder was initialized with.
-// If dest is outside the polygon set it will be clamped to the nearest
-// polygon edge.
-// The function returns nil if no path exists because start is outside
-// the polygon set.
+// Path returns a path from start to dest as a sequence of points crossing
+// neighbouring polygons of the navmesh. If no path exists nil is returned.
 func (p *Pathfinder) Path(start, dest Point) []Point {
-	d := p2v(dest)
-	if !p.polygonSet.Contains(d) {
-		dest = ensureInside(p.polygonSet, v2p(p.polygonSet.ClosestPt(d)))
+	sIdx := p.polyIndex(start)
+	dIdx := p.polyIndex(dest)
+	if sIdx < 0 || dIdx < 0 {
+		return nil
 	}
-	p.visibilityGraph = p.prepareVisibilityGraph(start, dest)
-	return astar.FindPath[Point](p.visibilityGraph, start, dest, nodeDist, nodeDist)
+	polyPath := astar.FindPath[int](p.graph, sIdx, dIdx, p.polyDist, p.polyDist)
+	if polyPath == nil {
+		return nil
+	}
+	pts := []Point{start}
+	for i := 0; i < len(polyPath)-1; i++ {
+		key := [2]int{polyPath[i], polyPath[i+1]}
+		if mid, ok := p.portals[key]; ok {
+			pts = append(pts, mid)
+		}
+	}
+	pts = append(pts, dest)
+	return pts
 }
 
-func ensureInside(ps poly.PolygonSet, pt Point) Point {
-	if ps.Contains(p2v(pt)) {
-		return pt
+func (p *Pathfinder) polyIndex(pt Point) int {
+	v := p2v(pt)
+	for i, poly := range p.polygons {
+		if poly.Contains(v, false) {
+			return i
+		}
 	}
-adjustment:
-	for dx := -1; dx <= 1; dx++ {
-		for dy := -1; dy <= 1; dy++ {
-			if dx == 0 && dy == 0 {
-				continue
+	return -1
+}
+
+func (p *Pathfinder) polyDist(a, b int) float64 {
+	return nodeDist(p.centers[a], p.centers[b])
+}
+
+func centroid(polygon poly.Polygon) Point {
+	var x, y float64
+	for _, v := range polygon {
+		x += float64(v.X)
+		y += float64(v.Y)
+	}
+	n := float64(len(polygon))
+	return Pt(x/n, y/n)
+}
+
+// navGraph builds a graph of polygon adjacency and the portal midpoint for each
+// connection.
+func navGraph(polygons [][]Point) (graph[int], map[[2]int]Point) {
+	g := make(graph[int])
+	portals := make(map[[2]int]Point)
+	for i := range polygons {
+		for j := i + 1; j < len(polygons); j++ {
+			if a1, a2, ok := sharedEdge(polygons[i], polygons[j]); ok {
+				g.link(i, j)
+				g.link(j, i)
+				mid := Pt((a1.X+a2.X)/2, (a1.Y+a2.Y)/2)
+				portals[[2]int{i, j}] = mid
+				portals[[2]int{j, i}] = mid
 			}
-			npt := pt.Add(Point{X: float64(dx), Y: float64(dy)})
-			if ps.Contains(p2v(npt)) {
-				pt = npt
-				break adjustment
+		}
+	}
+	return g, portals
+}
+
+func sharedEdge(a, b []Point) (Point, Point, bool) {
+	for i := range a {
+		a1 := a[i]
+		a2 := a[(i+1)%len(a)]
+		for j := range b {
+			b1 := b[j]
+			b2 := b[(j+1)%len(b)]
+			if (a1 == b2 && a2 == b1) || (a1 == b1 && a2 == b2) {
+				return a1, a2, true
 			}
 		}
 	}
-	return pt
+	return Point{}, Point{}, false
 }
 
-func concaveVertices(ps poly.PolygonSet) []Point {
-	var vs []Point
-	for i, p := range ps {
-		t := concave
-		if isHole(ps, i) {
-			t = convex
-		}
-		vs = append(vs, verticesOfType(p, t)...)
-	}
-	return vs
-}
-
-func isHole(ps poly.PolygonSet, i int) bool {
-	hole := false
-	for j, p := range ps {
-		if i != j && p.Contains(ps[i][0], false) {
-			hole = !hole
-		}
-	}
-	return hole
-}
-
-type vertexType int
-
-const (
-	concave = vertexType(iota)
-	convex
-)
-
-func verticesOfType(p poly.Polygon, t vertexType) []Point {
-	var vs []Point
-	for i, v := range p {
-		isConcave := p.IsConcaveAt(i)
-		if (t == concave && isConcave) || (t == convex && !isConcave) {
-			vs = append(vs, v2p(v))
-		}
-	}
-	return vs
-}
-
-func visibilityGraph(ps poly.PolygonSet, points []Point) graph[Point] {
-	type edge struct {
-		from, to Point
-	}
-
-	numWorkers := runtime.NumCPU()
-	jobs := make(chan int, len(points))
-	results := make(chan edge, len(points)*len(points))
-
-	var wg sync.WaitGroup
-	wg.Add(numWorkers)
-
-	for w := 0; w < numWorkers; w++ {
-		go func() {
-			defer wg.Done()
-			for i := range jobs {
-				a := points[i]
-				for j, b := range points {
-					if i == j {
-						continue
-					}
-					if inLineOfSight(ps, p2v(a), p2v(b)) {
-						results <- edge{from: a, to: b}
-					}
-				}
-			}
-		}()
-	}
-
-	for i := range points {
-		jobs <- i
-	}
-	close(jobs)
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	vis := make(graph[Point])
-	for e := range results {
-		vis.link(e.from, e.to)
-	}
-
-	return vis
-}
-
-func inLineOfSight(ps poly.PolygonSet, start, end geom.Vec2) bool {
-	lineOfSight := poly.LineSeg{A: start, B: end}
-	for _, p := range ps {
-		if p.IsCrossedBy(lineOfSight) {
-			return false
-		}
-	}
-
-	// ensure the whole line segment lies within the accessible area.
-	// checking only the middle point may miss holes close to the
-	// start or end position, so we check multiple points
-	const checks = 3
-	for i := 1; i <= checks; i++ {
-		t := float32(i) / float32(checks+1)
-		pt := start.Lerp(end, t)
-		if !ps.Contains(pt) {
-			return false
-		}
-	}
-	return true
-}
-
-// nodeDist is the cost function for the A* algorithm. The visibility graph has
-// 2d points as nodes, so we calculate the Euclidean distance.
 func nodeDist(a, b Point) float64 {
-	c := a.Sub(b)
-	return math.Sqrt(c.X*c.X + c.Y*c.Y)
-}
-
-func (p *Pathfinder) prepareVisibilityGraph(start, dest Point) graph[Point] {
-	vis := copyGraph(p.cachedGraph)
-	vis[start] = vis[start]
-	vis[dest] = vis[dest]
-
-	points := append([]Point(nil), p.concaveVertices...)
-	points = append(points, dest)
-	for _, b := range points {
-		if b != start && inLineOfSight(p.polygonSet, p2v(start), p2v(b)) {
-			vis.link(start, b)
-		}
-		if b != start && inLineOfSight(p.polygonSet, p2v(b), p2v(start)) {
-			vis.link(b, start)
-		}
-	}
-
-	points = append(p.concaveVertices, start)
-	for _, b := range points {
-		if b != dest && inLineOfSight(p.polygonSet, p2v(dest), p2v(b)) {
-			vis.link(dest, b)
-		}
-		if b != dest && inLineOfSight(p.polygonSet, p2v(b), p2v(dest)) {
-			vis.link(b, dest)
-		}
-	}
-
-	if inLineOfSight(p.polygonSet, p2v(start), p2v(dest)) {
-		vis.link(start, dest)
-		vis.link(dest, start)
-	}
-
-	return vis
-}
-
-func copyGraph(src graph[Point]) graph[Point] {
-	dst := make(graph[Point], len(src))
-	for n, adj := range src {
-		if len(adj) > 0 {
-			dst[n] = append([]Point(nil), adj...)
-		}
-	}
-	return dst
+	dx := a.X - b.X
+	dy := a.Y - b.Y
+	return math.Hypot(dx, dy)
 }
