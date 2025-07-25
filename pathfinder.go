@@ -8,6 +8,8 @@ package pathfind
 
 import (
 	"math"
+	"runtime"
+	"sync"
 
 	"github.com/fzipp/astar"
 	"github.com/fzipp/geom"
@@ -133,17 +135,49 @@ func verticesOfType(p poly.Polygon, t vertexType) []Point {
 }
 
 func visibilityGraph(ps poly.PolygonSet, points []Point) graph[Point] {
-	vis := make(graph[Point])
-	for i, a := range points {
-		for j, b := range points {
-			if i == j {
-				continue
-			}
-			if inLineOfSight(ps, p2v(a), p2v(b)) {
-				vis.link(a, b)
-			}
-		}
+	type edge struct {
+		from, to Point
 	}
+
+	numWorkers := runtime.NumCPU()
+	jobs := make(chan int, len(points))
+	results := make(chan edge, len(points)*len(points))
+
+	var wg sync.WaitGroup
+	wg.Add(numWorkers)
+
+	for w := 0; w < numWorkers; w++ {
+		go func() {
+			defer wg.Done()
+			for i := range jobs {
+				a := points[i]
+				for j, b := range points {
+					if i == j {
+						continue
+					}
+					if inLineOfSight(ps, p2v(a), p2v(b)) {
+						results <- edge{from: a, to: b}
+					}
+				}
+			}
+		}()
+	}
+
+	for i := range points {
+		jobs <- i
+	}
+	close(jobs)
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	vis := make(graph[Point])
+	for e := range results {
+		vis.link(e.from, e.to)
+	}
+
 	return vis
 }
 
