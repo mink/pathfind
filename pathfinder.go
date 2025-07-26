@@ -19,7 +19,7 @@ import (
 type Pathfinder struct {
 	polygons []poly.Polygon
 	graph    graph[int]
-	portals  map[[2]int]Point
+	portals  map[[2]int][2]Point
 	centers  []Point
 }
 
@@ -48,14 +48,20 @@ func (p *Pathfinder) Path(start, dest Point) []Point {
 	if polyPath == nil {
 		return nil
 	}
-	pts := []Point{start}
+	var portals [][2]Point
 	for i := 0; i < len(polyPath)-1; i++ {
 		key := [2]int{polyPath[i], polyPath[i+1]}
-		if mid, ok := p.portals[key]; ok {
-			pts = append(pts, mid)
+		if edge, ok := p.portals[key]; ok {
+			a1, a2 := edge[0], edge[1]
+			c := p.centers[polyPath[i]]
+			if triArea2(a1, a2, c) < 0 {
+				a1, a2 = a2, a1
+			}
+			portals = append(portals, [2]Point{a1, a2})
 		}
 	}
-	pts = append(pts, dest)
+	pts := funnel(start, dest, portals)
+	pts = cleanPath(pts)
 	return pts
 }
 
@@ -83,19 +89,18 @@ func centroid(polygon poly.Polygon) Point {
 	return Pt(x/n, y/n)
 }
 
-// navGraph builds a graph of polygon adjacency and the portal midpoint for each
+// navGraph builds a graph of polygon adjacency and the portal edge for each
 // connection.
-func navGraph(polygons [][]Point) (graph[int], map[[2]int]Point) {
+func navGraph(polygons [][]Point) (graph[int], map[[2]int][2]Point) {
 	g := make(graph[int])
-	portals := make(map[[2]int]Point)
+	portals := make(map[[2]int][2]Point)
 	for i := range polygons {
 		for j := i + 1; j < len(polygons); j++ {
 			if a1, a2, ok := sharedEdge(polygons[i], polygons[j]); ok {
 				g.link(i, j)
 				g.link(j, i)
-				mid := Pt((a1.X+a2.X)/2, (a1.Y+a2.Y)/2)
-				portals[[2]int{i, j}] = mid
-				portals[[2]int{j, i}] = mid
+				portals[[2]int{i, j}] = [2]Point{a1, a2}
+				portals[[2]int{j, i}] = [2]Point{a2, a1}
 			}
 		}
 	}
@@ -121,4 +126,95 @@ func nodeDist(a, b Point) float64 {
 	dx := a.X - b.X
 	dy := a.Y - b.Y
 	return math.Hypot(dx, dy)
+}
+
+func triArea2(a, b, c Point) float64 {
+	return (b.X-a.X)*(c.Y-a.Y) - (b.Y-a.Y)*(c.X-a.X)
+}
+
+func funnel(start, end Point, portals [][2]Point) []Point {
+	if len(portals) == 0 {
+		return []Point{start, end}
+	}
+	portals = append(portals, [2]Point{end, end})
+
+	apex := start
+	left := portals[0][0]
+	right := portals[0][1]
+	apexIndex, leftIndex, rightIndex := 0, 0, 0
+	path := []Point{start}
+
+	for i := 1; i < len(portals); i++ {
+		pLeft := portals[i][0]
+		pRight := portals[i][1]
+
+		if triArea2(apex, right, pRight) <= 0 {
+			if apex == right || triArea2(apex, left, pRight) > 0 {
+				right = pRight
+				rightIndex = i
+			} else {
+				path = append(path, left)
+				apex = left
+				apexIndex = leftIndex
+				left = apex
+				right = apex
+				leftIndex = apexIndex
+				rightIndex = apexIndex
+				i = apexIndex
+				continue
+			}
+		}
+
+		if triArea2(apex, left, pLeft) >= 0 {
+			if apex == left || triArea2(apex, right, pLeft) < 0 {
+				left = pLeft
+				leftIndex = i
+			} else {
+				path = append(path, right)
+				apex = right
+				apexIndex = rightIndex
+				left = apex
+				right = apex
+				leftIndex = apexIndex
+				rightIndex = apexIndex
+				i = apexIndex
+				continue
+			}
+		}
+	}
+
+	if path[len(path)-1] != end {
+		path = append(path, end)
+	}
+	return path
+}
+
+func cleanPath(path []Point) []Point {
+	if len(path) < 3 {
+		return path
+	}
+	res := []Point{path[0]}
+	for i := 1; i < len(path)-1; i++ {
+		prev := res[len(res)-1]
+		next := path[i+1]
+		cur := path[i]
+		if collinear(prev, cur, next) {
+			continue
+		}
+		res = append(res, cur)
+	}
+	res = append(res, path[len(path)-1])
+	return res
+}
+
+func collinear(a, b, c Point) bool {
+	area := triArea2(a, b, c)
+	if math.Abs(area) > 1e-6 {
+		return false
+	}
+	abx := b.X - a.X
+	aby := b.Y - a.Y
+	cbx := c.X - b.X
+	cby := c.Y - b.Y
+	return (abx*cbx >= 0) && (aby*cby >= 0)
 }
