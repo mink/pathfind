@@ -65,10 +65,48 @@ func (p *Pathfinder) Path(start, dest Point) []Point {
 	return pts
 }
 
+func (p *Pathfinder) PathWithMargin(start, dest Point) []Point {
+	const margin = 0.000001
+	pts := p.Path(start, dest)
+	if pts == nil {
+		return nil
+	}
+	for i, pt := range pts {
+		idx := p.polyIndexTol(pt)
+		if idx < 0 {
+			continue
+		}
+		poly := p.polygons[idx]
+		v := p2v(pt)
+		if poly.Contains(v, false) {
+			continue
+		}
+		c := p.centers[idx]
+		dir := c.Sub(pt)
+		dist := math.Hypot(dir.X, dir.Y)
+		if dist == 0 {
+			continue
+		}
+		pts[i] = Pt(pt.X+dir.X/dist*margin, pt.Y+dir.Y/dist*margin)
+	}
+	return pts
+}
+
 func (p *Pathfinder) polyIndex(pt Point) int {
 	v := p2v(pt)
 	for i, poly := range p.polygons {
 		if poly.Contains(v, false) {
+			return i
+		}
+	}
+	return -1
+}
+
+// like polyIndex but treats points on polygon edges as being inside
+func (p *Pathfinder) polyIndexTol(pt Point) int {
+	v := p2v(pt)
+	for i, pol := range p.polygons {
+		if pol.Contains(v, true) {
 			return i
 		}
 	}
