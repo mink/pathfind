@@ -48,6 +48,10 @@ func (p *Pathfinder) Path(start, dest Point) []Point {
 	if polyPath == nil {
 		return nil
 	}
+	if sIdx == dIdx {
+		// start and dest are in the same polygon, no need for pathfinding
+		return []Point{start, dest}
+	}
 	var portals [][2]Point
 	for i := 0; i < len(polyPath)-1; i++ {
 		key := [2]int{polyPath[i], polyPath[i+1]}
