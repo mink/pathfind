@@ -8,6 +8,7 @@ package pathfind
 
 import (
 	"math"
+	"sort"
 
 	"github.com/fzipp/astar"
 	"github.com/fzipp/pathfind/internal/poly"
@@ -45,19 +46,13 @@ type polyBox struct {
 func NewPathfinder(polygons [][]Point) *Pathfinder {
 	ps := make([]poly.Polygon, len(polygons))
 	centers := make([]Point, len(polygons))
-	for i, p := range polygons {
-		ps[i] = ps2vs(p)
-		centers[i] = centroid(ps[i])
-	}
-	g, portals := navGraph(polygons)
-
 	var boxes []polyBox
 
 	for i, p := range polygons {
 		ps[i] = ps2vs(p)
 		centers[i] = centroid(ps[i])
 
-		// Compute bounding box
+		// bounding box
 		minX, minY := math.MaxFloat64, math.MaxFloat64
 		maxX, maxY := -math.MaxFloat64, -math.MaxFloat64
 		for _, pt := range p {
@@ -80,6 +75,12 @@ func NewPathfinder(polygons [][]Point) *Pathfinder {
 		})
 	}
 
+	// sort for binary search
+	sort.Slice(boxes, func(i, j int) bool {
+		return boxes[i].box.minX < boxes[j].box.minX
+	})
+
+	g, portals := navGraph(polygons)
 	return &Pathfinder{polygons: ps, graph: g, portals: portals, centers: centers, boxes: boxes}
 }
 
@@ -157,13 +158,38 @@ func (p *Pathfinder) polyIndex(pt Point) int {
 // like polyIndex but treats points on polygon edges as being inside
 func (p *Pathfinder) polyIndexTol(pt Point) int {
 	v := p2v(pt)
-	for _, entry := range p.boxes {
-		if entry.box.Contains(pt) {
-			if p.polygons[entry.index].Contains(v, true) {
-				return entry.index
-			}
+
+	// binary search for starting index
+	low, high := 0, len(p.boxes)
+	for low < high {
+		mid := (low + high) / 2
+		if pt.X < p.boxes[mid].box.minX {
+			high = mid
+		} else {
+			low = mid + 1
 		}
 	}
+
+	for i := low - 1; i >= 0; i-- {
+		box := p.boxes[i].box
+		if pt.X < box.minX {
+			break
+		}
+		if box.Contains(pt) && p.polygons[p.boxes[i].index].Contains(v, true) {
+			return p.boxes[i].index
+		}
+	}
+
+	for i := low; i < len(p.boxes); i++ {
+		box := p.boxes[i].box
+		if pt.X > box.maxX {
+			break
+		}
+		if box.Contains(pt) && p.polygons[p.boxes[i].index].Contains(v, true) {
+			return p.boxes[i].index
+		}
+	}
+
 	return -1
 }
 
