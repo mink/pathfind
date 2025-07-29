@@ -92,13 +92,13 @@ func (p *Pathfinder) Path(start, dest Point) []Point {
 	if sIdx < 0 || dIdx < 0 {
 		return nil
 	}
-	polyPath := astar.FindPath[int](p.graph, sIdx, dIdx, p.polyDist, p.polyDist)
-	if polyPath == nil {
-		return nil
-	}
 	if sIdx == dIdx {
 		// start and dest are in the same polygon, no need for pathfinding
 		return []Point{start, dest}
+	}
+	polyPath := astar.FindPath[int](p.graph, sIdx, dIdx, p.polyDist, p.polyDist)
+	if polyPath == nil {
+		return nil
 	}
 	var portals [][2]Point
 	for i := 0; i < len(polyPath)-1; i++ {
