@@ -21,6 +21,23 @@ type Pathfinder struct {
 	graph    graph[int]
 	portals  map[[2]int][2]Point
 	centers  []Point
+
+	boxes []polyBox // minimal spatial index
+}
+
+type AABB struct {
+	minX, minY float64
+	maxX, maxY float64
+}
+
+func (b AABB) Contains(pt Point) bool {
+	return pt.X >= b.minX && pt.X <= b.maxX &&
+		pt.Y >= b.minY && pt.Y <= b.maxY
+}
+
+type polyBox struct {
+	index int
+	box   AABB
 }
 
 // NewPathfinder creates a Pathfinder initialized with a navmesh.
@@ -33,7 +50,37 @@ func NewPathfinder(polygons [][]Point) *Pathfinder {
 		centers[i] = centroid(ps[i])
 	}
 	g, portals := navGraph(polygons)
-	return &Pathfinder{polygons: ps, graph: g, portals: portals, centers: centers}
+
+	var boxes []polyBox
+
+	for i, p := range polygons {
+		ps[i] = ps2vs(p)
+		centers[i] = centroid(ps[i])
+
+		// Compute bounding box
+		minX, minY := math.MaxFloat64, math.MaxFloat64
+		maxX, maxY := -math.MaxFloat64, -math.MaxFloat64
+		for _, pt := range p {
+			if pt.X < minX {
+				minX = pt.X
+			}
+			if pt.Y < minY {
+				minY = pt.Y
+			}
+			if pt.X > maxX {
+				maxX = pt.X
+			}
+			if pt.Y > maxY {
+				maxY = pt.Y
+			}
+		}
+		boxes = append(boxes, polyBox{
+			index: i,
+			box:   AABB{minX, minY, maxX, maxY},
+		})
+	}
+
+	return &Pathfinder{polygons: ps, graph: g, portals: portals, centers: centers, boxes: boxes}
 }
 
 // Path returns a path from start to dest as a sequence of points crossing
@@ -110,9 +157,11 @@ func (p *Pathfinder) polyIndex(pt Point) int {
 // like polyIndex but treats points on polygon edges as being inside
 func (p *Pathfinder) polyIndexTol(pt Point) int {
 	v := p2v(pt)
-	for i, pol := range p.polygons {
-		if pol.Contains(v, true) {
-			return i
+	for _, entry := range p.boxes {
+		if entry.box.Contains(pt) {
+			if p.polygons[entry.index].Contains(v, true) {
+				return entry.index
+			}
 		}
 	}
 	return -1
