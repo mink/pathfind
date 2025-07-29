@@ -39,8 +39,8 @@ func NewPathfinder(polygons [][]Point) *Pathfinder {
 // Path returns a path from start to dest as a sequence of points crossing
 // neighbouring polygons of the navmesh. If no path exists nil is returned.
 func (p *Pathfinder) Path(start, dest Point) []Point {
-	sIdx := p.polyIndex(start)
-	dIdx := p.polyIndex(dest)
+	sIdx := p.polyIndexTol(start)
+	dIdx := p.polyIndexTol(dest)
 	if sIdx < 0 || dIdx < 0 {
 		return nil
 	}
@@ -65,6 +65,7 @@ func (p *Pathfinder) Path(start, dest Point) []Point {
 	return pts
 }
 
+// if a point lies on the boundary it is moved a small distance towards the center of its polygon.
 func (p *Pathfinder) PathWithMargin(start, dest Point) []Point {
 	const margin = 0.000001
 	pts := p.Path(start, dest)
