@@ -96,6 +96,9 @@ func (p *Pathfinder) Path(start, dest Point) []Point {
 		// start and dest are in the same polygon, no need for pathfinding
 		return []Point{start, dest}
 	}
+	if p.hasNavmeshLineOfSight(start, dest) {
+		return []Point{start, dest}
+	}
 	polyPath := astar.FindPath[int](p.graph, sIdx, dIdx, p.polyDist, p.polyDist)
 	if polyPath == nil {
 		return nil
@@ -143,6 +146,20 @@ func (p *Pathfinder) PathWithMargin(start, dest Point) []Point {
 		pts[i] = Pt(pt.X+dir.X/dist*margin, pt.Y+dir.Y/dist*margin)
 	}
 	return pts
+}
+
+func (p *Pathfinder) hasNavmeshLineOfSight(start, end Point) bool {
+	const samples = 32
+	for i := 0; i <= samples; i++ {
+		t := float64(i) / float64(samples)
+		x := start.X + t*(end.X-start.X)
+		y := start.Y + t*(end.Y-start.Y)
+		pt := Pt(x, y)
+		if p.polyIndexTol(pt) == -1 {
+			return false
+		}
+	}
+	return true
 }
 
 func (p *Pathfinder) polyIndex(pt Point) int {
